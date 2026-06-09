@@ -13,7 +13,7 @@ export const DEFAULTS = {
     pitch: 55,
     rotation: 0,
     mapStyle: 'amap://styles/dark',
-    speed: 60,                   // simulation acceleration; 60 = 1 real-sec = 1 sim-min
+    speed: 1,                    // 1 = wall-clock time. Trains run iff the line is actually operating now.
     frameMs: 200,                // how often to refresh train positions; 200ms ≈ smooth at 60-300x speed
     showHint: true
 };

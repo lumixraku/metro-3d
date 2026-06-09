@@ -9,7 +9,7 @@
     "build": "rollup -c",
     "watch": "rollup -c -w",
     "dev": "run-p watch serve",
-    "serve": "http-server -c-1 -p 8080 -o /index.html"
+    "serve": "http-server . -c-1 -p 8080 -o /"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

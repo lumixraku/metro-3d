@@ -53,19 +53,20 @@ export class LineSchedule {
     }
 
     /**
-     * Position of a single virtual train along the measured path at sim time t
+     * Position state of a virtual train along the measured path at sim time t
      * (seconds since the train's own dispatch). `direction` is +1 (toward end)
      * or -1 (toward start, departing from far terminus).
      *
-     * Returns [lng, lat] or null if t is outside [0, runtime).
+     * Returns {coord, distance} where `distance` is cumulative metres along
+     * the path (independent of direction), or null if t is outside [0, runtime).
      */
-    _positionAt(tSec, direction) {
+    _stateAt(tSec, direction) {
         if (tSec < 0 || tSec >= this.runtimeSec) return null;
         const progress = tSec / this.runtimeSec;
-        const dist = direction > 0
+        const distance = direction > 0
             ? progress * this.measured.total
             : (1 - progress) * this.measured.total;
-        return pointAlong(this.measured, dist);
+        return {coord: pointAlong(this.measured, distance), distance};
     }
 
     /**
@@ -87,13 +88,15 @@ export class LineSchedule {
         const latestK   = Math.floor(sinceFirstSec / headway);
         for (let k = Math.max(0, earliestK); k <= latestK; k++) {
             const t = sinceFirstSec - k * headway;
-            const coord = this._positionAt(t, +1);
-            if (coord) {
+            const state = this._stateAt(t, +1);
+            if (state) {
                 out.push({
                     id: `${this.line.id}|out|${k}`,
                     lineId: this.line.id,
                     color: this.line.color,
-                    coord,
+                    coord: state.coord,
+                    distance: state.distance,
+                    measured: this.measured,
                     direction: +1,
                     progress: t / runtime
                 });
@@ -108,13 +111,15 @@ export class LineSchedule {
             const lk = Math.floor(sinceRetSec / headway);
             for (let k = Math.max(0, ek); k <= lk; k++) {
                 const t = sinceRetSec - k * headway;
-                const coord = this._positionAt(t, -1);
-                if (coord) {
+                const state = this._stateAt(t, -1);
+                if (state) {
                     out.push({
                         id: `${this.line.id}|ret|${k}`,
                         lineId: this.line.id,
                         color: this.line.color,
-                        coord,
+                        coord: state.coord,
+                        distance: state.distance,
+                        measured: this.measured,
                         direction: -1,
                         progress: 1 - t / runtime
                     });

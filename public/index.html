@@ -7,8 +7,11 @@
     <meta name="description" content="A real-time 3D digital map of the Shenzhen Metro." />
     <link rel="stylesheet" href="../dist/metro-3d.css" />
     <style>
-        html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: #0a0c10; }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: #0a0c10; color: #e8e8e8; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
         #map { width: 100vw; height: 100vh; }
+        #boot-error { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+        #boot-error .card { background: #1c1e26; border-radius: 12px; padding: 24px 32px; max-width: 420px; }
+        #boot-error code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 3px; font-size: 90%; }
     </style>
     <script src="../dist/metro-3d.js"></script>
 </head>
@@ -16,16 +19,28 @@
     <div id="map"></div>
     <script>
         const params = new URLSearchParams(location.search);
-        const map = new m3d.MetroMap({
-            container: 'map',
-            amapKey: params.get('key') || '715eb1e20c9c5a54146d752565e049eb',
-            amapSecurityJsCode: params.get('sec') || undefined,
-            center: [114.0579, 22.5431],
-            zoom: 11.5,
-            pitch: 55,
-            speed: Number(params.get('speed') || 60)
-        });
-        window._metro = map;
+        const amapKey = params.get('key') || m3d.AMAP_KEY;
+        const amapSecurityJsCode = params.get('sec') || m3d.AMAP_SECURITY_CODE || undefined;
+
+        if (!amapKey) {
+            document.body.innerHTML = `
+                <div id="boot-error"><div class="card">
+                    <h2>缺少 AMap Key</h2>
+                    <p>构建时未注入 <code>M3D_AMAP_KEY</code>。</p>
+                    <p>请把 <code>.env.example</code> 复制为 <code>.env</code> 并填入你的高德 Web 服务 key，然后重新运行 <code>npm run build</code>。</p>
+                    <p>也可以临时附加 <code>?key=YOUR_KEY</code> 到 URL 上来测试。</p>
+                </div></div>`;
+        } else {
+            window._metro = new m3d.MetroMap({
+                container: 'map',
+                amapKey,
+                amapSecurityJsCode,
+                center: [114.0579, 22.5431],
+                zoom: 11.5,
+                pitch: 55,
+                speed: Number(params.get('speed') || 60)
+            });
+        }
     </script>
 </body>
 </html>

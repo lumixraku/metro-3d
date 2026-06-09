@@ -1,16 +1,23 @@
 /**
  * Shenzhen Metro line metadata.
  *
- * Sources: 深圳地铁集团 official site, Wikipedia 深圳地铁线路, and field signage.
- * Colors approximate official PANTONE specs as commonly published.
- * Operating hours: each line's published end-of-day window; gaps outside the
- * window mean no trains are simulated.
- * Headway: average minutes between trains. Peak windows reflect 7:30-9:30 AM
- * and 17:30-19:30 PM published intervals. Off-peak uses the line's typical
- * weekday daytime headway.
+ * Colors are the authoritative hex values from the Wikipedia
+ * `Template:深圳地铁颜色` (`Module:Adjacent stations/深圳地铁`), which mirror
+ * the Shenzhen municipal standard "Road Traffic Management Facilities
+ * Installation Technical Standard Part 5: Transit Hub Passenger Service
+ * Signs" — i.e. the official PANTONE specs converted to RGB. Don't tweak
+ * these by eye.
  *
- * `query` is the string passed to AMap LineSearch when no station list is
- * cached locally. It must exactly match AMap's 公交线路 record name.
+ * Note: L2 (蛇口) and L8 (盐田) share `#db6d1c` because the two are
+ * operationally a single through-running line in revenue service, and the
+ * official map paints them the same colour.
+ *
+ * Operating hours: each line's published first/last train window; outside
+ * that window no trains are simulated.
+ * Headway: average minutes between trains, peak vs off-peak.
+ *
+ * `query` is the string passed to AMap's bus/linename REST endpoint to
+ * fetch the polyline and station list.
  */
 
 const PEAK_WINDOWS = [
@@ -27,7 +34,7 @@ export const LINES = [
         code: '1',
         nameZh: '罗宝线',
         nameEn: 'Luobao Line',
-        color: '#009A44',
+        color: '#00ab39',
         textColor: '#FFFFFF',
         query: '深圳地铁1号线',
         firstTrain: '06:30',
@@ -42,7 +49,7 @@ export const LINES = [
         code: '2',
         nameZh: '蛇口线',
         nameEn: 'Shekou Line',
-        color: '#E84C7C',
+        color: '#db6d1c',
         textColor: '#FFFFFF',
         query: '深圳地铁2号线',
         firstTrain: '06:30',
@@ -57,7 +64,7 @@ export const LINES = [
         code: '3',
         nameZh: '龙岗线',
         nameEn: 'Longgang Line',
-        color: '#00A2DE',
+        color: '#00a2e1',
         textColor: '#FFFFFF',
         query: '深圳地铁3号线',
         firstTrain: '06:25',
@@ -72,7 +79,7 @@ export const LINES = [
         code: '4',
         nameZh: '龙华线',
         nameEn: 'Longhua Line',
-        color: '#DE0011',
+        color: '#dc241f',
         textColor: '#FFFFFF',
         query: '深圳地铁4号线',
         firstTrain: '06:30',
@@ -87,7 +94,7 @@ export const LINES = [
         code: '5',
         nameZh: '环中线',
         nameEn: 'Huanzhong Line',
-        color: '#93357C',
+        color: '#9950b2',
         textColor: '#FFFFFF',
         query: '深圳地铁5号线',
         firstTrain: '06:30',
@@ -102,7 +109,7 @@ export const LINES = [
         code: '6',
         nameZh: '光明线',
         nameEn: 'Guangming Line',
-        color: '#98C843',
+        color: '#3abca8',
         textColor: '#FFFFFF',
         query: '深圳地铁6号线',
         firstTrain: '06:30',
@@ -117,7 +124,7 @@ export const LINES = [
         code: '7',
         nameZh: '西丽线',
         nameEn: 'Xili Line',
-        color: '#00B5A4',
+        color: '#0035ad',
         textColor: '#FFFFFF',
         query: '深圳地铁7号线',
         firstTrain: '06:30',
@@ -132,7 +139,7 @@ export const LINES = [
         code: '8',
         nameZh: '盐田线',
         nameEn: 'Yantian Line',
-        color: '#00A0E9',
+        color: '#db6d1c',
         textColor: '#FFFFFF',
         query: '深圳地铁8号线',
         firstTrain: '06:30',
@@ -147,7 +154,7 @@ export const LINES = [
         code: '9',
         nameZh: '梅林线',
         nameEn: 'Meilin Line',
-        color: '#C0884C',
+        color: '#846e74',
         textColor: '#FFFFFF',
         query: '深圳地铁9号线',
         firstTrain: '06:30',
@@ -162,7 +169,7 @@ export const LINES = [
         code: '10',
         nameZh: '坂田线',
         nameEn: 'Bantian Line',
-        color: '#E5316C',
+        color: '#f8779e',
         textColor: '#FFFFFF',
         query: '深圳地铁10号线',
         firstTrain: '06:30',
@@ -177,7 +184,7 @@ export const LINES = [
         code: '11',
         nameZh: '机场线',
         nameEn: 'Airport Line',
-        color: '#6B2C8B',
+        color: '#6a1d44',
         textColor: '#FFFFFF',
         query: '深圳地铁11号线',
         firstTrain: '06:30',
@@ -192,7 +199,7 @@ export const LINES = [
         code: '12',
         nameZh: '南宝线',
         nameEn: 'Nanbao Line',
-        color: '#003F8E',
+        color: '#a192b2',
         textColor: '#FFFFFF',
         query: '深圳地铁12号线',
         firstTrain: '06:30',
@@ -207,8 +214,8 @@ export const LINES = [
         code: '14',
         nameZh: '东部快线',
         nameEn: 'Eastern Express',
-        color: '#2D6F5D',
-        textColor: '#FFFFFF',
+        color: '#f2c75c',
+        textColor: '#000000',
         query: '深圳地铁14号线',
         firstTrain: '06:30',
         lastTrain: '23:00',
@@ -222,7 +229,7 @@ export const LINES = [
         code: '16',
         nameZh: '龙坪线',
         nameEn: 'Longping Line',
-        color: '#B58151',
+        color: '#1e22aa',
         textColor: '#FFFFFF',
         query: '深圳地铁16号线',
         firstTrain: '06:30',
@@ -237,8 +244,8 @@ export const LINES = [
         code: '20',
         nameZh: '机场快线',
         nameEn: 'Airport Express',
-        color: '#A4538C',
-        textColor: '#FFFFFF',
+        color: '#88dbdf',
+        textColor: '#000000',
         query: '深圳地铁20号线',
         firstTrain: '06:30',
         lastTrain: '22:30',

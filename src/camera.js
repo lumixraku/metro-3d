@@ -72,8 +72,10 @@ export class CameraController {
             const next = clamp(current - dy * TILT_SENSITIVITY, MIN_PITCH, MAX_PITCH);
             this.map.setPitch(next, true);
         } else if (this._active === 'rotate') {
+            // Drag right → camera orbits clockwise around the map centre, so
+            // the visible scene rotates left (matches Google Maps' shift-drag).
             const current = this.map.getRotation();
-            const next = current + dx * ROTATE_SENSITIVITY;
+            const next = current - dx * ROTATE_SENSITIVITY;
             this.map.setRotation(((next % 360) + 360) % 360, true);
         }
         e.stopPropagation();

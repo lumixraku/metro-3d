@@ -74,7 +74,9 @@ export function parseHHMM(s) {
 /** Minute-of-day at the local Asia/Shanghai timezone for the given Date. */
 export function minutesOfDay(date) {
     // We assume the browser/runtime is in CST or the user accepts local time.
-    // For exactness we offset by the device timezone vs +08:00.
+    // Include milliseconds so train positions advance continuously every frame
+    // rather than stepping once per whole second (the "second hand" stutter).
     const local = new Date(date.getTime());
-    return local.getHours() * 60 + local.getMinutes() + local.getSeconds() / 60;
+    return local.getHours() * 60 + local.getMinutes() +
+        (local.getSeconds() + local.getMilliseconds() / 1000) / 60;
 }

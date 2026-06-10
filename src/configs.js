@@ -13,16 +13,5 @@ export const DEFAULTS = {
     pitch: 55,
     rotation: 0,
     mapStyle: 'amap://styles/dark',
-    speed: 1,                    // 1 = wall-clock time. Trains run iff the line is actually operating now.
-    frameMs: 200,                // how often to refresh train positions; 200ms ≈ smooth at 60-300x speed
     showHint: true
 };
-
-// Frame budget for sim ticks. Faster speeds need more frequent ticks to avoid
-// trains visibly teleporting between updates.
-export function tickInterval(speed) {
-    if (speed >= 600) return 33;  // ~30fps
-    if (speed >= 120) return 80;
-    if (speed >= 30)  return 150;
-    return 250;
-}

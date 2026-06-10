@@ -16,11 +16,12 @@
  *   6. Run the render loop
  */
 
-import {DEFAULTS, tickInterval} from './configs.js';
+import {DEFAULTS} from './configs.js';
 import {LINES} from './data/lines.js';
 import {loadAllLines} from './data/loader.js';
 import Clock from './clock.js';
 import {Simulation} from './simulation.js';
+import {GLOverlay} from './layers/gl-overlay.js';
 import {LineLayer} from './layers/line-layer.js';
 import {StationLayer} from './layers/station-layer.js';
 import {TrainLayer} from './layers/train-layer.js';
@@ -94,6 +95,9 @@ export default class MetroMap {
 
         this.simulation = new Simulation(lineGeoms);
 
+        // Lines and trains draw onto our own WebGL canvas (overlaying AMap) so
+        // they repaint every animation frame; AMap.Polyline would throttle them.
+        this.overlay = new GLOverlay(this._mapEl);
         this.lineLayer = new LineLayer(AMap, this.map);
         this.stationLayer = new StationLayer(AMap, this.map);
         this.trainLayer = new TrainLayer(AMap, this.map);
@@ -103,9 +107,8 @@ export default class MetroMap {
         }
         this.stationLayer.rebuild(lineGeoms.map(({line, geom}) => ({line, stations: geom.stations})));
 
-        // Sim clock starts at "now" but at accelerated speed so users see motion
-        // even outside Shenzhen's peak window.
-        this.clock = new Clock({speed: this.options.speed, startAt: Date.now()});
+        // Real wall-clock time. The simulation always runs at 1x.
+        this.clock = new Clock({startAt: Date.now()});
 
         // Side panels.
         this.linePanel = new LinePanel(this.container, LINES.filter(l => lineGeoms.some(lg => lg.line.id === l.id)), {
@@ -114,8 +117,7 @@ export default class MetroMap {
                 else this.lineLayer.clearHighlight();
             },
             onToggleVisible: (id, visible) => {
-                const entry = this.lineLayer.polylines.get(id);
-                if (entry) entry.polyline.setMap(visible ? this.map : null);
+                this.lineLayer.setVisible(id, visible);
                 this.trainLayer.setLineVisibility(id, visible);
             }
         });
@@ -135,21 +137,28 @@ export default class MetroMap {
     }
 
     _startLoop() {
+        // Every animation frame (~16ms at 60Hz) we recompute train positions
+        // from the real-time clock, project all geometry to screen pixels, and
+        // repaint the overlay ourselves — bypassing AMap's throttled redraw.
         const tick = () => {
             const now = this.clock.now();
             const trains = this.simulation.snapshot(now);
-            this.trainLayer.update(trains);
-            this._timeout = setTimeout(tick, tickInterval(this.clock.speed));
+            this.overlay.begin();
+            this.lineLayer.draw(this.overlay);
+            this.trainLayer.draw(this.overlay, trains);
+            this.overlay.flush();
+            this._raf = requestAnimationFrame(tick);
         };
         tick();
     }
 
     destroy() {
-        if (this._timeout) clearTimeout(this._timeout);
+        if (this._raf) cancelAnimationFrame(this._raf);
         this.camera?.destroy();
         this.trainLayer?.destroy();
         this.stationLayer?.destroy();
         this.lineLayer?.destroy();
+        this.overlay?.destroy();
         this.map?.destroy();
     }
 }

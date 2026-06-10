@@ -1,22 +1,23 @@
 /**
- * Renders one stroke per metro line in its official colour, drawn onto the
- * self-managed WebGL overlay (not AMap.Polyline) so it shares the same crisp
- * 60fps repaint loop as the trains. Highlighted lines render thicker and
- * fully opaque; the rest dim.
+ * One stroke per metro line in its official colour, fed to the 3D scene as
+ * constant-pixel-width lines lying just above the ground. The GPU's near-plane
+ * clipping handles behind-camera points, so there is no per-vertex culling or
+ * segment clipping here any more — just emit the path.
  */
 
-import {hexToRgb} from './gl-overlay.js';
+import {hexToRgb} from './gl-scene.js';
 
-const NORMAL_WIDTH = 4;
-const HILITE_WIDTH = 7;
+const NORMAL_WIDTH = 8;
+const HILITE_WIDTH = 12;
 const NORMAL_OPACITY = 0.95;
 const DIM_OPACITY = 0.35;
+const LIFT_M = 1; // metres above ground so lines don't z-fight the base map
 
 export class LineLayer {
     constructor(AMap, map) {
         this.AMap = AMap;
         this.map = map;
-        this.lines = new Map();      // lineId -> {line, path, rgb}
+        this.lines = new Map(); // lineId -> {line, path, rgb}
         this._hidden = new Set();
         this._highlightId = null;
     }
@@ -25,53 +26,32 @@ export class LineLayer {
         this.lines.set(line.id, {line, path, rgb: hexToRgb(line.color)});
     }
 
-    highlight(lineId) {
-        this._highlightId = lineId;
-    }
-
-    clearHighlight() {
-        this._highlightId = null;
-    }
+    highlight(lineId) { this._highlightId = lineId; }
+    clearHighlight() { this._highlightId = null; }
 
     setVisible(lineId, visible) {
         if (visible) this._hidden.delete(lineId);
         else this._hidden.add(lineId);
     }
 
-    /**
-     * Project a [lng,lat] path to screen-pixel [x,y] points. Points outside the
-     * current view bounds (where 3D behind-camera points project to garbage
-     * coordinates) become null so the overlay breaks the line there instead of
-     * drawing it shooting off into the sky.
-     */
-    _project(path, bounds) {
-        const map = this.map;
-        const AMap = this.AMap;
-        const out = new Array(path.length);
-        for (let i = 0; i < path.length; i++) {
-            const ll = new AMap.LngLat(path[i][0], path[i][1]);
-            if (!bounds.contains(ll)) { out[i] = null; continue; }
-            const p = map.lngLatToContainer(ll);
-            out[i] = [p.x, p.y];
-        }
-        return out;
-    }
-
-    /** Draw all visible lines onto the overlay. Called each animation frame. */
-    draw(overlay) {
+    /** Push every visible line's segments into the scene (world coords). */
+    build(scene) {
         const hi = this._highlightId;
-        const bounds = this.map.getBounds();
+        const z = LIFT_M * scene.worldPerMeter;
         for (const [id, {path, rgb}] of this.lines) {
             if (this._hidden.has(id)) continue;
             let width, opacity;
-            if (!hi) {
-                width = NORMAL_WIDTH; opacity = NORMAL_OPACITY;
-            } else if (id === hi) {
-                width = HILITE_WIDTH; opacity = 1;
-            } else {
-                width = NORMAL_WIDTH; opacity = DIM_OPACITY;
+            if (!hi) { width = NORMAL_WIDTH; opacity = NORMAL_OPACITY; }
+            else if (id === hi) { width = HILITE_WIDTH; opacity = 1; }
+            else { width = NORMAL_WIDTH; opacity = DIM_OPACITY; }
+            const rgba = [rgb[0], rgb[1], rgb[2], opacity];
+
+            const world = new Array(path.length);
+            for (let i = 0; i < path.length; i++) {
+                const w = scene.toWorld(path[i][0], path[i][1]);
+                world[i] = [w[0], w[1], z];
             }
-            overlay.addLine(this._project(path, bounds), width, [rgb[0], rgb[1], rgb[2], opacity]);
+            scene.addPolyline(world, width, rgba);
         }
     }
 

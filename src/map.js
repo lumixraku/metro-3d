@@ -21,7 +21,7 @@ import {LINES} from './data/lines.js';
 import {loadAllLines} from './data/loader.js';
 import Clock from './clock.js';
 import {Simulation} from './simulation.js';
-import {GLOverlay} from './layers/gl-overlay.js';
+import {GLScene} from './layers/gl-scene.js';
 import {LineLayer} from './layers/line-layer.js';
 import {StationLayer} from './layers/station-layer.js';
 import {TrainLayer} from './layers/train-layer.js';
@@ -75,6 +75,11 @@ export default class MetroMap {
             doubleClickZoom: true
         });
 
+        // 3D building blocks. The dark base style draws them almost black, so we
+        // overlay a styled Buildings layer with lit walls/roofs so Shenzhen reads
+        // as a 3D city skyline once zoomed in (AMap only extrudes at high zoom).
+        this._addBuildings(AMap);
+
         // AMap default: right-mouse drag pitches/rotates; we keep that and add
         // cmd/shift-drag on top.
         this.camera = new CameraController(this.map, this._mapEl);
@@ -95,9 +100,9 @@ export default class MetroMap {
 
         this.simulation = new Simulation(lineGeoms);
 
-        // Lines and trains draw onto our own WebGL canvas (overlaying AMap) so
-        // they repaint every animation frame; AMap.Polyline would throttle them.
-        this.overlay = new GLOverlay(this._mapEl);
+        // Lines and trains render in a real 3D scene sharing AMap's camera and
+        // depth buffer (GLCustomLayer), driven every frame via map.render().
+        this.scene = new GLScene(AMap, this.map, this.options.center);
         this.lineLayer = new LineLayer(AMap, this.map);
         this.stationLayer = new StationLayer(AMap, this.map);
         this.trainLayer = new TrainLayer(AMap, this.map);
@@ -129,6 +134,25 @@ export default class MetroMap {
         this._startLoop();
     }
 
+    _addBuildings(AMap) {
+        // Opaque grey-white building blocks for a clean white city model.
+        // NOTE: AMap colours are AARRGGBB — alpha FIRST. Alpha ff = fully solid
+        // (no see-through); color1 is the roof, color2 the wall (a touch darker
+        // so the massing reads in 3D). AMap's own renderer depth-tests the
+        // blocks, so opaque colours are all that's needed for correct occlusion.
+        this.buildings = new AMap.Buildings({zooms: [15, 20], zIndex: 12, heightFactor: 1});
+        this.buildings.setStyle({
+            hideWithoutStyle: false,
+            areas: [{
+                color1: 'ffe9ebee', // roof — opaque near-white
+                color2: 'ffc2c6cc', // wall — opaque grey
+                // Greater-Shenzhen bounding box; buildings outside keep defaults.
+                path: [[113.6, 22.35], [114.8, 22.35], [114.8, 22.95], [113.6, 22.95]]
+            }]
+        });
+        this.map.add(this.buildings);
+    }
+
     _addHint() {
         const hint = document.createElement('div');
         hint.className = 'm3d-hint';
@@ -137,16 +161,17 @@ export default class MetroMap {
     }
 
     _startLoop() {
-        // Every animation frame (~16ms at 60Hz) we recompute train positions
-        // from the real-time clock, project all geometry to screen pixels, and
-        // repaint the overlay ourselves — bypassing AMap's throttled redraw.
+        // Every animation frame (~16ms at 60Hz): recompute train positions from
+        // the real-time clock, rebuild the scene geometry in world coords, then
+        // map.render() drives the GLCustomLayer to redraw with the live camera.
         const tick = () => {
             const now = this.clock.now();
             const trains = this.simulation.snapshot(now);
-            this.overlay.begin();
-            this.lineLayer.draw(this.overlay);
-            this.trainLayer.draw(this.overlay, trains);
-            this.overlay.flush();
+            this.scene.beginFrame();
+            this.lineLayer.build(this.scene);
+            this.trainLayer.build(this.scene, trains);
+            this.scene.commit();
+            this.map.render();
             this._raf = requestAnimationFrame(tick);
         };
         tick();
@@ -158,7 +183,7 @@ export default class MetroMap {
         this.trainLayer?.destroy();
         this.stationLayer?.destroy();
         this.lineLayer?.destroy();
-        this.overlay?.destroy();
+        this.scene?.destroy();
         this.map?.destroy();
     }
 }

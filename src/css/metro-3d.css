@@ -1,11 +1,11 @@
-/* Metro 3D — UI overlay styles */
+/* Metro 3D — UI overlay styles (light theme, solid/opaque panels) */
 
 .m3d-root {
     position: relative;
     width: 100%;
     height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    color: #f0f0f0;
+    color: #1c1d21;
 }
 
 .m3d-map {
@@ -22,19 +22,18 @@
     width: 220px;
     max-height: calc(100% - 32px);
     overflow-y: auto;
-    background: rgba(20, 22, 28, 0.85);
+    background: #ffffff;
+    border: 1px solid #e2e4e8;
     border-radius: 10px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     padding: 12px 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     z-index: 10;
 }
 
 .m3d-panel-title {
     font-size: 13px;
     font-weight: 600;
-    color: #e8e8e8;
+    color: #1c1d21;
     padding: 0 8px 8px;
     letter-spacing: 0.5px;
 }
@@ -57,11 +56,11 @@
 }
 
 .m3d-line-row:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: #f0f1f4;
 }
 
 .m3d-line-row.is-active {
-    background: rgba(255, 255, 255, 0.15);
+    background: #e4e7ec;
 }
 
 .m3d-line-row.is-hidden {
@@ -83,21 +82,21 @@
 
 .m3d-line-name {
     flex: 1;
-    color: #e0e0e0;
+    color: #2c2e33;
 }
 
 .m3d-line-eye {
     background: none;
     border: none;
-    color: #777;
+    color: #9aa0a8;
     cursor: pointer;
     padding: 2px 6px;
     font-size: 14px;
     border-radius: 4px;
 }
 
-.m3d-line-row.is-hidden .m3d-line-eye { color: #444; }
-.m3d-line-eye:hover { color: #fff; }
+.m3d-line-row.is-hidden .m3d-line-eye { color: #c4c8ce; }
+.m3d-line-eye:hover { color: #1c1d21; }
 
 /* --- Clock panel (top right) --- */
 
@@ -105,12 +104,11 @@
     position: absolute;
     top: 16px;
     right: 16px;
-    background: rgba(20, 22, 28, 0.85);
+    background: #ffffff;
+    border: 1px solid #e2e4e8;
     border-radius: 10px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     padding: 10px 14px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     z-index: 10;
     text-align: center;
 }
@@ -120,38 +118,7 @@
     font-size: 22px;
     font-weight: 600;
     letter-spacing: 1px;
-    color: #ffffff;
-    margin-bottom: 6px;
-}
-
-.m3d-clock-controls {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-}
-
-.m3d-clock-controls button,
-.m3d-clock-controls select {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: #e8e8e8;
-    border-radius: 5px;
-    padding: 3px 8px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: inherit;
-}
-
-.m3d-clock-controls button:hover,
-.m3d-clock-controls select:hover {
-    background: rgba(255, 255, 255, 0.18);
-}
-
-.m3d-clock-controls select option {
-    background: #1a1c22;
-    color: #e8e8e8;
+    color: #1c1d21;
 }
 
 /* --- Loading --- */
@@ -159,7 +126,7 @@
 .m3d-loading {
     position: absolute;
     inset: 0;
-    background: rgba(10, 12, 16, 0.7);
+    background: #f4f5f7;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -173,24 +140,25 @@
 }
 
 .m3d-loading-card {
-    background: rgba(28, 30, 38, 0.95);
+    background: #ffffff;
+    border: 1px solid #e2e4e8;
     border-radius: 14px;
     padding: 24px 32px;
     min-width: 320px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     text-align: center;
 }
 
 .m3d-loading-title {
     font-size: 16px;
     font-weight: 600;
-    color: #ffffff;
+    color: #1c1d21;
     margin-bottom: 10px;
 }
 
 .m3d-loading-status {
     font-size: 12px;
-    color: #b0b0b0;
+    color: #6b7078;
     margin-bottom: 14px;
     height: 16px;
 }
@@ -198,7 +166,7 @@
 .m3d-loading-bar {
     width: 100%;
     height: 4px;
-    background: rgba(255, 255, 255, 0.08);
+    background: #e4e7ec;
     border-radius: 2px;
     overflow: hidden;
 }
@@ -213,14 +181,14 @@
 /* --- Station popup --- */
 
 .m3d-station-popup {
-    background: rgba(20, 22, 28, 0.95);
+    background: #ffffff;
     border-radius: 8px;
     padding: 8px 12px;
-    color: #fff;
+    color: #1c1d21;
     font-size: 13px;
     min-width: 80px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    border: 1px solid #e2e4e8;
 }
 
 .m3d-station-name {
@@ -241,20 +209,20 @@
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(20, 22, 28, 0.8);
-    color: #cccccc;
+    background: #ffffff;
+    border: 1px solid #e2e4e8;
+    color: #4a4f57;
     font-size: 11px;
     padding: 6px 14px;
     border-radius: 14px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     z-index: 10;
     pointer-events: none;
     user-select: none;
 }
 
 .m3d-hint kbd {
-    background: rgba(255, 255, 255, 0.12);
+    background: #eceef1;
     padding: 1px 6px;
     border-radius: 3px;
     margin: 0 2px;

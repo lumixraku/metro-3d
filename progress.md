@@ -52,3 +52,27 @@
 **解决**：开启 WebGL **背面剔除**（`CULL_FACE`），只画朝向相机的外表面。轨道线三角形朝向不一致不能一起剔除，所以把 overlay 拆成两趟绘制：第一趟画轨道线（关剔除），第二趟画立方体面（开背面剔除）。盒子各面按一致的外向缠绕顺序输出。见 `gl-overlay.js` 的 `flush`（`_linePos`/`_solidPos` 双流 + `frontFace`/`cullFace`）。
 
 **教训**：屏幕空间伪 3D 的两个方向（宽 vs 高）在屏幕上不垂直，足迹一定要在地理空间算；没有深度缓冲就必须自己做画家算法排序 + 背面剔除。
+
+## 架构升级：切到真·3D 渲染（GLCustomLayer，2026-06-10）
+
+上面那套 2D 屏幕空间 overlay 反复出问题——尤其 3D 俯视下「相机背后的点」被 `lngLatToContainer` 投影成几十万~几百万 px 的垃圾坐标，连出横穿全屏的**飞线**。用阈值/`bounds` 裁剪都是治标的 hack，会顾此失彼（要么飞线复活，要么高缩放下线段消失）。
+
+**根因**：屏幕空间 overlay **根本没有深度、没有相机**——我把 3D 投影外包给 `lngLatToContainer`，它丢掉了裁剪空间的 `w` 符号，我没法知道点在相机背后。
+
+**做法**：改用 `AMap.GLCustomLayer`，和地图**共享真实相机 MVP 矩阵 + 深度缓冲**（`map.customCoords.getMVPMatrix()` / `lngLatToCoord`），见 `src/layers/gl-scene.js`：
+
+- 几何全部送**世界坐标**（米，东/北 + 向上的高度），由真实透视 MVP 变换。
+- **相机背后由 GPU 近平面裁剪自动处理** → 飞线从原理上消失，不再需要任何裁剪 hack。
+- **遮挡由深度缓冲自动处理** → 不再需要画家排序、背面剔除；列车是真·立方体（世界坐标足迹 + 高度挤出），内壁不会穿透。
+- 线路用**屏幕等宽 + 斜接（miter join）**的 3D 线（`addPolyline`，顶点带 prev/next 邻居算斜接方向），转弯不再有锯齿；宽度 8px（高亮 12px）。
+- 每帧主循环重建几何后调 `map.render()` 驱动 `GLCustomLayer.render()`，渲染与 rAF 1:1（不被 AMap 限流）。
+- 旧的 `gl-overlay.js`（2D 屏幕空间）及其 culling/排序/裁剪补丁全部删除。
+
+注意：`map.render()` 每帧会让 AMap 重绘整个 3D 场景，比旧的「上层 2D canvas」重；前台窗口可达屏幕刷新率，自动化/后台标签页会被浏览器 rAF 节流（与代码无关）。
+
+## 白色主题 + 灰白 3D 建筑（2026-06-10）
+
+- 底图样式 `amap://styles/dark` → `amap://styles/light`；UI 面板/加载层等全部改为**白色、不透明**（移除 `backdrop-blur` 和 rgba 透明），见 `metro-3d.css` 与 `index.html`。
+- 3D 建筑用 `AMap.Buildings` 图层（`map.js` 的 `_addBuildings`），灰白、**不透明**。
+  - ⚠️ **AMap 颜色是 AARRGGBB（alpha 在最前）**。误当成 RRGGBBAA 会把 alpha 当颜色、颜色当 alpha → 建筑半透明发蓝。不透明灰白用 `'ffe9ebee'`（顶）/`'ffc2c6cc'`（墙）。
+  - 建筑只在 zoom≥15 才被 AMap 挤出，城市全景下看不到，正常。

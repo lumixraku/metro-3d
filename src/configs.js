@@ -12,6 +12,6 @@ export const DEFAULTS = {
     zoom: 12,
     pitch: 55,
     rotation: 0,
-    mapStyle: 'amap://styles/dark',
+    mapStyle: 'amap://styles/light',
     showHint: true
 };

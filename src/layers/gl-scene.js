@@ -226,6 +226,7 @@ export class GLScene {
 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
+        gl.depthMask(true); // train pass writes depth; reset here as depthMask is sticky across frames
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -250,10 +251,14 @@ export class GLScene {
             gl.drawArrays(gl.TRIANGLES, 0, this._solidLen / SOLID_STRIDE);
         }
 
-        // Lines on top (ground level), depth-tested against the boxes. The
-        // geometry is static, so it's only re-uploaded when rebuilt; every frame
-        // we just re-bind and redraw with the live MVP.
+        // Lines on top (ground level). They all sit on one z-plane, so depth
+        // WRITE is disabled for this pass: lines still get occluded by the boxes
+        // (depth test stays on, testing against the depths the train pass wrote),
+        // but lines never write — so coplanar/overlapping lines never compare
+        // against each other and can't z-fight. Their stacking is then pure draw
+        // order (painter's), which is stable as the camera moves.
         if (this._lineArr.length) {
+            gl.depthMask(false);
             gl.useProgram(this.lineProg);
             gl.uniformMatrix4fv(this.l_mvp, false, mvp);
             gl.uniform2f(this.l_viewport, vw, vh);

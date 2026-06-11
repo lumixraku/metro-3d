@@ -168,9 +168,8 @@ export default class MetroMap {
             const now = this.clock.now();
             const trains = this.simulation.snapshot(now);
             this.scene.beginFrame();
-            this.lineLayer.build(this.scene);
+            this.lineLayer.build(this.scene); // no-op unless lines changed
             this.trainLayer.build(this.scene, trains);
-            this.scene.commit();
             this.map.render();
             this._raf = requestAnimationFrame(tick);
         };

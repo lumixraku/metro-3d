@@ -4,7 +4,7 @@ How the real-time 3D Shenzhen Metro renderer is actually built. Pure
 implementation detail: coordinate math, GPU buffer layout, shaders, the
 schedule model, and the AMap integration. File references point at `src/`.
 
-## 1. Custom WebGL layer sharing AMap's camera (`layers/gl-scene.js`)
+## Custom WebGL layer sharing AMap's camera (`layers/gl-scene.js`)
 
 Rendering rides on `AMap.GLCustomLayer`, so it draws into AMap's own WebGL
 context and reuses its MVP matrix and depth buffer instead of doing
@@ -110,19 +110,32 @@ the `111320` used for xy are both "metres per degree of latitude" — they diffe
 only because they were sourced/rounded independently; either is fine at city
 scale.)
 
-## 2. Interleaved vertex buffers (`gl-scene.js`)
+## Interleaved vertex buffers (`gl-scene.js`)
 
-Two programs, two interleaved `Float32Array` layouts uploaded with `DYNAMIC_DRAW`:
+Two programs, two interleaved `Float32Array` layouts. It runs on AMap's
+**WebGL1** context (`GLCustomLayer` owns the canvas — we can't ask for WebGL2),
+so no VAOs / native instancing; just `vertexAttribPointer` each draw.
 
 - **Solid** — `SOLID_STRIDE = 7` floats: `pos(3) + color(4)`.
 - **Line** — `LINE_STRIDE = 15` floats: `pos(3) + prev(3) + next(3) + side(1) + width(1) + color(4)`.
 
-CPU-side scratch arrays (`_solid`, `_line`) are filled each frame by the layers
-via `solidQuad()` / `addPolyline()`, then `commit()` freezes them into typed
-arrays. Attributes are bound with `vertexAttribPointer(loc, size, FLOAT, false,
+The two buffers update on different cadences, because their inputs do:
+
+- **Trains move every frame.** `solidQuad()` writes straight into a persistent,
+  growable `Float32Array` (`_solidArr`, doubled when it must grow — never
+  reallocated per frame). `_render` reuses one GPU store: `bufferData(size)` only
+  when it must grow, then `bufferSubData(0, _solidArr.subarray(0, _solidLen))`
+  (a view, no copy) every frame. `DYNAMIC_DRAW`.
+- **Lines are static in world space** (the camera lives in the MVP, not the
+  geometry), so `addPolyline()` fills `_line` only when `LineLayer` rebuilds it
+  (highlight / visibility / dpr change), `rebuildLines()` freezes it to
+  `_lineArr`, and `_render` uploads it (`STATIC_DRAW`) once via the
+  `_lineUploadPending` flag — not every frame.
+
+Attributes are bound with `vertexAttribPointer(loc, size, FLOAT, false,
 stride*4, offset*4)`. `solidQuad(a,b,c,d)` emits two triangles `a,b,c / a,c,d`.
 
-## 3. Constant-pixel-width miter polylines in the vertex shader (`gl-scene.js`)
+## Constant-pixel-width miter polylines in the vertex shader (`gl-scene.js`)
 
 Lines keep a constant screen width regardless of zoom and bevel their joins,
 entirely in `VERT_LINE`:
@@ -142,7 +155,7 @@ entirely in `VERT_LINE`:
   `pts[i-1] || A` and `pts[i+2] || B` as the end neighbours. Width is multiplied
   by `devicePixelRatio` so lines are crisp on HiDPI.
 
-## 4. Stateless train positions from headway math (`simulation.js`)
+## Stateless train positions from headway math (`simulation.js`)
 
 No per-train objects or per-frame integration. Given a simulated `Date`, the
 set of live trains and their positions is derived analytically each frame.
@@ -171,7 +184,7 @@ Per line (`LineSchedule`):
 `Simulation.snapshot(date)` flattens all lines into one array of lightweight
 `{id, lineId, color, coord, distance, measured, direction, progress}`.
 
-## 5. Path measurement and sampling (`utils/geo.js`)
+## Path measurement and sampling (`utils/geo.js`)
 
 - `distanceMeters` is Haversine on a sphere (R = 6378137) — accurate enough
   under ~100 km, avoids bundling turf.
@@ -183,7 +196,7 @@ Per line (`LineSchedule`):
   nearest-*vertex* search (not nearest-point-on-segment — the AMap polyline is
   dense enough), then sorts stations by distance along the path.
 
-## 6. Trains as extruded 3D cuboids (`layers/train-layer.js`)
+## Trains as extruded 3D cuboids (`layers/train-layer.js`)
 
 Each train is built as oriented boxes fed to `scene.solidQuad`, with the depth
 buffer handling occlusion so faces emit in any order.
@@ -204,18 +217,24 @@ buffer handling occlusion so faces emit in any order.
   0.62` (walls), `CAP_SHADE 0.48` (ends) — fake directional lighting via flat
   per-face multipliers. `hexToRgb` results are cached per colour.
 
-## 7. Lines and the per-frame loop (`layers/line-layer.js`, `map.js`)
+## Lines and the per-frame loop (`layers/line-layer.js`, `map.js`)
 
 - `LineLayer.build(scene)` converts each line's lng/lat path to world coords,
   lifts it `LIFT_M = 1 m` (× `worldPerMeter`) above ground to avoid z-fighting
   the basemap, and calls `addPolyline`. Highlight state widens the active line
   to `HILITE_WIDTH` and dims others to `DIM_OPACITY 0.35`.
+- **`build` is cached**: line world coords don't change frame to frame (only the
+  MVP does), so it rebuilds only when an input changes — a `_dirty` flag set by
+  `add` / `highlight` / `clearHighlight` / `setVisible`, plus a dpr check.
+  Otherwise it's an early-return no-op, sparing a full rebuild + GPU re-upload of
+  the (~2.7 MB) line geometry every frame.
 - The driver in `map.js._startLoop` runs every `requestAnimationFrame`:
-  `clock.now()` → `simulation.snapshot` → `scene.beginFrame()` →
-  `lineLayer.build` + `trainLayer.build` → `scene.commit()` → `map.render()`.
-  `map.render()` is what triggers the `GLCustomLayer.render` callback.
+  `clock.now()` → `simulation.snapshot` → `scene.beginFrame()` (resets only the
+  train scratch) → `lineLayer.build` (usually a no-op) + `trainLayer.build` →
+  `map.render()`. `map.render()` is what triggers the `GLCustomLayer.render`
+  callback, which uploads and draws both buffers.
 
-## 8. Scalable simulation clock (`clock.js`)
+## Scalable simulation clock (`clock.js`)
 
 - `now()` accumulates `(realNow - lastReal) * speed` into `_simTime`; every
   other module reads simulated time only through it, never `Date.now()`.
@@ -225,7 +244,7 @@ buffer handling occlusion so faces emit in any order.
   seconds + milliseconds/60 so train positions advance continuously per frame
   rather than stepping once per whole second.
 
-## 9. Camera modifier-drag overlay (`camera.js`)
+## Camera modifier-drag overlay (`camera.js`)
 
 - Capture-phase `mousedown`/`mousemove`/`mouseup` on window. On mousedown with
   ⌘/Ctrl (tilt) or ⇧ (rotate), it sets `map.setStatus({dragEnable:false})` to
@@ -234,7 +253,7 @@ buffer handling occlusion so faces emit in any order.
   `setRotation(((current - dx*0.5) % 360 + 360) % 360, true)`. The `true`
   (`immediately`) flag skips AMap smoothing for 1:1 cursor tracking.
 
-## 10. AMap line geometry via REST (`data/loader.js`)
+## AMap line geometry via REST (`data/loader.js`)
 
 - Calls `https://restapi.amap.com/v3/bus/linename` **directly via `fetch`**, not
   the AMap JS plugin: the key is a "Web 服务" key, and the JS plugin sends
@@ -251,14 +270,14 @@ buffer handling occlusion so faces emit in any order.
 - **Caching**: results go to `localStorage` under `m3d:line:v3:<id>` with a
   30-day TTL. `fetchJson` races the request against an 8 s timeout.
 
-## 11. 3D buildings (`map.js._addBuildings`)
+## 3D buildings (`map.js._addBuildings`)
 
 `AMap.Buildings({zooms:[15,20]})` is overlaid with `setStyle`. AMap building
 colours are **AARRGGBB (alpha first)**; `ff` alpha = fully opaque. `color1` is
 the roof, `color2` the (darker) wall, scoped to a Shenzhen bounding-box `path`.
 AMap's renderer depth-tests these, so opaque colours alone give correct occlusion.
 
-## 12. Build & key injection (`rollup.config.mjs`)
+## Build & key injection (`rollup.config.mjs`)
 
 - A ~20-line in-repo `.env` parser (no `dotenv` dependency) loads `M3D_AMAP_KEY`
   / `M3D_AMAP_SECURITY_CODE`, merged with `process.env`.

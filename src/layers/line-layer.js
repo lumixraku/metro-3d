@@ -20,39 +20,52 @@ export class LineLayer {
         this.lines = new Map(); // lineId -> {line, path, rgb}
         this._hidden = new Set();
         this._highlightId = null;
+        // Line geometry is static in world space, so it's cached in the scene and
+        // only rebuilt when one of its inputs changes (set/visibility/dpr).
+        this._dirty = true;
+        this._builtDpr = 0;
     }
 
     add(line, path) {
         this.lines.set(line.id, {line, path, rgb: hexToRgb(line.color)});
+        this._dirty = true;
     }
 
-    highlight(lineId) { this._highlightId = lineId; }
-    clearHighlight() { this._highlightId = null; }
+    highlight(lineId) { this._highlightId = lineId; this._dirty = true; }
+    clearHighlight() { this._highlightId = null; this._dirty = true; }
 
     setVisible(lineId, visible) {
         if (visible) this._hidden.delete(lineId);
         else this._hidden.add(lineId);
+        this._dirty = true;
     }
 
-    /** Push every visible line's segments into the scene (world coords). */
+    /** Rebuild the scene's cached line geometry, but only when it changed. World
+     *  coords are stable across frames (the camera lives in the MVP), so on an
+     *  unchanged frame this is a no-op. */
     build(scene) {
-        const hi = this._highlightId;
-        const z = LIFT_M * scene.worldPerMeter;
-        for (const [id, {path, rgb}] of this.lines) {
-            if (this._hidden.has(id)) continue;
-            let width, opacity;
-            if (!hi) { width = NORMAL_WIDTH; opacity = NORMAL_OPACITY; }
-            else if (id === hi) { width = HILITE_WIDTH; opacity = 1; }
-            else { width = NORMAL_WIDTH; opacity = DIM_OPACITY; }
-            const rgba = [rgb[0], rgb[1], rgb[2], opacity];
+        if (!this._dirty && this._builtDpr === scene.dpr) return;
+        scene.rebuildLines(() => {
+            const hi = this._highlightId;
+            const z = LIFT_M * scene.worldPerMeter;
+            for (const [id, {path, rgb}] of this.lines) {
+                if (this._hidden.has(id)) continue;
+                let width, opacity;
+                if (!hi) { width = NORMAL_WIDTH; opacity = NORMAL_OPACITY; }
+                else if (id === hi) { width = HILITE_WIDTH; opacity = 1; }
+                else { width = NORMAL_WIDTH; opacity = DIM_OPACITY; }
+                const rgba = [rgb[0], rgb[1], rgb[2], opacity];
 
-            const world = new Array(path.length);
-            for (let i = 0; i < path.length; i++) {
-                const w = scene.toWorld(path[i][0], path[i][1]);
-                world[i] = [w[0], w[1], z];
+                const world = new Array(path.length);
+                for (let i = 0; i < path.length; i++) {
+                    const w = scene.toWorld(path[i][0], path[i][1]);
+                    world[i] = [w[0], w[1], z];
+                }
+                scene.addPolyline(world, width, rgba);
             }
-            scene.addPolyline(world, width, rgba);
-        }
+        });
+        this._dirty = false;
+        this._builtDpr = scene.dpr;
     }
 
     destroy() {

@@ -70,6 +70,29 @@
 
 注意：`map.render()` 每帧会让 AMap 重绘整个 3D 场景，比旧的「上层 2D canvas」重；前台窗口可达屏幕刷新率，自动化/后台标签页会被浏览器 rAF 节流（与代码无关）。
 
+### 两个坐标转换 API 的区别（务必分清）
+
+这次重构的本质，就是从 `lngLatToContainer`（屏幕坐标）换成 `lngLatToCoord`（世界坐标）。两者一字之差，干的事完全不同：
+
+| API | 输出 | 坐标系 | 投影在哪做 | 相机背后裁剪 |
+|---|---|---|---|---|
+| `map.lngLatToContainer` | `{x, y}` 像素 | **屏幕**（容器左上角为原点，x 右 / y 下） | AMap 内部一步投影到屏幕 | **无**（丢了裁剪空间的 `w` 符号） |
+| `map.customCoords.lngLatToCoord` | `[x, y]` | **世界坐标**（米级，投影前） | 留给 GPU（顶点着色器里乘 MVP） | **GPU 近平面裁剪自动处理** |
+
+- **旧 overlay** 用 `lngLatToContainer`：经纬度 → 屏幕像素 → 在 2D canvas 上连线。投影外包给了 AMap，它把 3D 压成 2D 时丢掉了 `w` 符号，所以**相机背后的点（`w ≤ 0`）会被返回成几十万~几百万 px 的垃圾坐标**，连出飞线。没有深度缓冲，遮挡/背面还得自己 hack。
+- **新 scene** 用 `lngLatToCoord`：经纬度 → 世界坐标 `[x,y]`（高度 z 由调用方加），塞进顶点 buffer，**投影不在 JS 里做**，而是顶点着色器里 `gl_Position = u_mvp * vec4(a_pos, 1.0)`，`u_mvp` 来自 `customCoords.getMVPMatrix()`。因为投影留给了 GPU，近平面裁剪和深度测试都自动生效。
+
+完整链路：
+
+```
+经纬度
+  --customCoords.lngLatToCoord-->  世界坐标 [x,y]（米）      ← CPU（gl-scene.js 的 toWorld）
+  --MVP 矩阵（顶点着色器里）-->     裁剪空间                 ← GPU
+  --透视除法 + 近平面裁剪-->        屏幕                     ← GPU 免费
+```
+
+**一句话**：飞线消失不是因为换了画法，而是因为**投影那一步从 `lngLatToContainer`（外包给 AMap、丢 w）改回了 GPU 自己用 MVP 做（保留 w，能裁剪相机背后）**。
+
 ## 白色主题 + 灰白 3D 建筑（2026-06-10）
 
 - 底图样式 `amap://styles/dark` → `amap://styles/light`；UI 面板/加载层等全部改为**白色、不透明**（移除 `backdrop-blur` 和 rgba 透明），见 `metro-3d.css` 与 `index.html`。
